@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CLOSED
+}
+
+enum StockMovementType {
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  PO_RECEIVE
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String?
+  email          String          @unique
+  emailVerified  DateTime?       @map("email_verified")
+  image          String?
+  passwordHash   String?         @map("password_hash")
+  role           Role            @default(VIEWER)
+  accounts       Account[]
+  sessions       Session[]
+  stockMovements StockMovement[]
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("categories")
+}
+
+model Product {
+  id               String              @id @default(cuid())
+  sku              String              @unique
+  name             String
+  description      String?
+  categoryId       String?             @map("category_id")
+  unit             String              @default("each")
+  barcode          String?             @unique
+  reorderThreshold Int                 @default(0) @map("reorder_threshold")
+  allowBackorder   Boolean             @default(false) @map("allow_backorder")
+  archivedAt       DateTime?           @map("archived_at")
+  category         Category?           @relation(fields: [categoryId], references: [id])
+  stockLevels      StockLevel[]
+  stockMovements   StockMovement[]
+  supplierProducts SupplierProduct[]
+  purchaseItems    PurchaseOrderItem[]
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  @@index([categoryId])
+  @@index([archivedAt])
+  @@map("products")
+}
+
+model Supplier {
+  id              String            @id @default(cuid())
+  name            String
+  email           String?
+  phone           String?
+  address         String?
+  leadTimeDays    Int               @default(0) @map("lead_time_days")
+  supplierProducts SupplierProduct[]
+  purchaseOrders  PurchaseOrder[]
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@map("suppliers")
+}
+
+model SupplierProduct {
+  id         String   @id @default(cuid())
+  supplierId String   @map("supplier_id")
+  productId  String   @map("product_id")
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([supplierId, productId])
+  @@index([productId])
+  @@map("supplier_products")
+}
+
+model Location {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  description  String?
+  stockLevels  StockLevel[]
+  movements    StockMovement[]
+  purchaseOrders PurchaseOrder[]
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@map("locations")
+}
+
+model StockLevel {
+  id              String   @id @default(cuid())
+  productId       String   @map("product_id")
+  locationId      String   @map("location_id")
+  quantityOnHand  Int      @default(0) @map("quantity_on_hand")
+  quantityReserved Int     @default(0) @map("quantity_reserved")
+  product         Product  @relation(fields: [productId], references: [id])
+  location        Location @relation(fields: [locationId], references: [id])
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([productId, locationId])
+  @@index([locationId])
+  @@map("stock_levels")
+}
+
+model StockMovement {
+  id           String            @id @default(cuid())
+  productId    String            @map("product_id")
+  locationId   String            @map("location_id")
+  userId       String?           @map("user_id")
+  type         StockMovementType
+  quantity     Int
+  reason       String?
+  referenceId  String?           @map("reference_id")
+  product      Product           @relation(fields: [productId], references: [id])
+  location     Location          @relation(fields: [locationId], references: [id])
+  user         User?             @relation(fields: [userId], references: [id])
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@index([locationId])
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@index([referenceId])
+  @@map("stock_movements")
+}
+
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  orderNumber  String              @unique @map("order_number")
+  supplierId   String              @map("supplier_id")
+  locationId   String              @map("location_id")
+  status       PurchaseOrderStatus @default(DRAFT)
+  notes        String?
+  orderedAt    DateTime?           @map("ordered_at")
+  receivedAt   DateTime?           @map("received_at")
+  closedAt     DateTime?           @map("closed_at")
+  createdById  String              @map("created_by_id")
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  location     Location            @relation(fields: [locationId], references: [id])
+  createdBy    User                @relation(fields: [createdById], references: [id])
+  items        PurchaseOrderItem[]
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([supplierId])
+  @@index([locationId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String        @id @default(cuid())
+  purchaseOrderId  String        @map("purchase_order_id")
+  productId        String        @map("product_id")
+  orderedQuantity  Int           @map("ordered_quantity")
+  receivedQuantity Int           @default(0) @map("received_quantity")
+  unitCostCents    Int           @default(0) @map("unit_cost_cents")
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product          Product       @relation(fields: [productId], references: [id])
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@map("purchase_order_items")
+}
