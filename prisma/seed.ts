@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, ProductType, Role, SizeUnit } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -83,6 +83,12 @@ async function main() {
       reorderThreshold: 10,
       unit: "each",
       barcode: "012345678905",
+      manufacturer: "Logitech",
+      productDate: new Date("2024-01-15"),
+      pitch: "2.5",
+      type: ProductType.INDOOR,
+      sizeUnit: SizeUnit.METERS,
+      sizeValue: 0.12,
     },
     {
       sku: "SKU-002",
@@ -92,6 +98,12 @@ async function main() {
       reorderThreshold: 25,
       unit: "each",
       barcode: "012345678912",
+      manufacturer: "Anker",
+      productDate: new Date("2024-06-01"),
+      pitch: "P3.91",
+      type: ProductType.INDOOR,
+      sizeUnit: SizeUnit.METERS,
+      sizeValue: 2,
     },
     {
       sku: "SKU-003",
@@ -101,6 +113,12 @@ async function main() {
       reorderThreshold: 50,
       unit: "each",
       barcode: "012345678929",
+      manufacturer: "Uline",
+      productDate: new Date("2025-02-10"),
+      pitch: "6.0",
+      type: ProductType.OUTDOOR,
+      sizeUnit: SizeUnit.INCHES,
+      sizeValue: 12,
     },
     {
       sku: "SKU-004",
@@ -110,13 +128,27 @@ async function main() {
       reorderThreshold: 15,
       unit: "pack",
       barcode: "012345678936",
+      manufacturer: "3M",
+      productDate: new Date("2025-09-20"),
+      pitch: "3.0",
+      type: ProductType.INDOOR,
+      sizeUnit: SizeUnit.KG,
+      sizeValue: 0.4,
     },
   ];
 
   for (const product of products) {
     const created = await prisma.product.upsert({
       where: { sku: product.sku },
-      update: { barcode: product.barcode },
+      update: {
+        barcode: product.barcode,
+        manufacturer: product.manufacturer,
+        productDate: product.productDate,
+        pitch: product.pitch,
+        type: product.type,
+        sizeUnit: product.sizeUnit,
+        sizeValue: product.sizeValue,
+      },
       create: product,
     });
 

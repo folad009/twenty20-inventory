@@ -29,6 +29,18 @@ enum StockMovementType {
   TRANSFER_OUT
 }
 
+enum ProductType {
+  INDOOR
+  OUTDOOR
+}
+
+enum SizeUnit {
+  METERS
+  FT
+  KG
+  INCHES
+}
+
 model User {
   id             String          @id @default(cuid())
   name           String?
@@ -107,6 +119,12 @@ model Product {
   barcode          String?             @unique
   reorderThreshold Int                 @default(0) @map("reorder_threshold")
   allowBackorder   Boolean             @default(false) @map("allow_backorder")
+  manufacturer     String?             @map("manufacturer")
+  productDate      DateTime?           @map("product_date") @db.Date
+  pitch            String?             @map("pitch")
+  type             ProductType?        @map("type")
+  sizeUnit         SizeUnit?           @map("size_unit")
+  sizeValue        Decimal?            @map("size_value") @db.Decimal(12, 4)
   archivedAt       DateTime?           @map("archived_at")
   category         Category?           @relation(fields: [categoryId], references: [id])
   stockLevels      StockLevel[]

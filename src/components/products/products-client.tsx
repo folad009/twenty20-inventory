@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { Archive, Package, Pencil, Plus } from "lucide-react";
-import type { Category, Product } from "@prisma/client";
+import type { Category, Product, ProductType, SizeUnit } from "@prisma/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { PaginationBar } from "@/components/shared/pagination-bar";
@@ -43,7 +44,45 @@ import {
   archiveProductAction,
 } from "@/server/actions/products";
 
-type ProductWithCategory = Product & { category: Category | null };
+type ProductWithCategory = Omit<Product, "sizeValue"> & {
+  sizeValue: string | null;
+  category: Category | null;
+};
+
+const TYPE_LABELS: Record<ProductType, string> = {
+  INDOOR: "Indoor",
+  OUTDOOR: "Outdoor",
+};
+
+const SIZE_UNIT_LABELS: Record<SizeUnit, string> = {
+  METERS: "Meters",
+  FT: "Ft",
+  KG: "KG",
+  INCHES: "Inches",
+};
+
+function toDateInputValue(value: Date | string | null | undefined) {
+  if (!value) return "";
+  const date = typeof value === "string" ? new Date(value) : value;
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatProductDate(value: Date | string | null | undefined) {
+  const input = toDateInputValue(value);
+  if (!input) return "—";
+  const [year, month, day] = input.split("-").map(Number);
+  return format(new Date(year, month - 1, day), "MMM d, yyyy");
+}
+
+function formatSize(value: string | null, unit: SizeUnit | null) {
+  if (!value || !unit) return "—";
+  const numeric = Number(value);
+  const amount = Number.isFinite(numeric) ? String(numeric) : value;
+  return `${amount} ${SIZE_UNIT_LABELS[unit]}`;
+}
 
 type ProductsClientProps = {
   initialData: {
@@ -86,6 +125,16 @@ export function ProductsClient({
       barcode: String(formData.get("barcode") ?? "") || null,
       reorderThreshold: Number(formData.get("reorderThreshold") ?? 0),
       allowBackorder: formData.get("allowBackorder") === "on",
+      manufacturer: String(formData.get("manufacturer") ?? ""),
+      productDate: new Date(String(formData.get("productDate") ?? "")),
+      pitch: String(formData.get("pitch") ?? ""),
+      type: String(formData.get("type") ?? "") as "INDOOR" | "OUTDOOR",
+      sizeUnit: String(formData.get("sizeUnit") ?? "") as
+        | "METERS"
+        | "FT"
+        | "KG"
+        | "INCHES",
+      sizeValue: Number(formData.get("sizeValue") ?? ""),
     };
 
     const result = editing
@@ -125,14 +174,18 @@ export function ProductsClient({
         <Plus data-icon="inline-start" />
         Add product
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit product" : "New product"}</DialogTitle>
           <DialogDescription>
             {editing ? "Update product details." : "Create a new inventory SKU."}
           </DialogDescription>
         </DialogHeader>
-        <form action={handleSubmit} className="flex flex-col gap-4">
+        <form
+          key={editing?.id ?? "new"}
+          action={handleSubmit}
+          className="flex flex-col gap-4"
+        >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="sku">SKU</Label>
@@ -188,6 +241,83 @@ export function ProductsClient({
                 defaultValue={editing?.barcode ?? ""}
               />
             </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="manufacturer">Manufacturer</Label>
+              <Input
+                id="manufacturer"
+                name="manufacturer"
+                required
+                maxLength={255}
+                defaultValue={editing?.manufacturer ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="productDate">Date</Label>
+              <Input
+                id="productDate"
+                name="productDate"
+                type="date"
+                required
+                defaultValue={toDateInputValue(editing?.productDate)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="pitch">Pitch</Label>
+              <Input
+                id="pitch"
+                name="pitch"
+                required
+                maxLength={32}
+                placeholder="2.5"
+                defaultValue={editing?.pitch ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="type">Type</Label>
+              <select
+                id="type"
+                name="type"
+                required
+                defaultValue={editing?.type ?? ""}
+                className="form-select"
+              >
+                <option value="" disabled>
+                  Select type
+                </option>
+                <option value="INDOOR">Indoor</option>
+                <option value="OUTDOOR">Outdoor</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="sizeValue">Number</Label>
+              <Input
+                id="sizeValue"
+                name="sizeValue"
+                type="number"
+                required
+                min={0.0001}
+                step="any"
+                defaultValue={editing?.sizeValue ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="sizeUnit">Size</Label>
+              <select
+                id="sizeUnit"
+                name="sizeUnit"
+                required
+                defaultValue={editing?.sizeUnit ?? ""}
+                className="form-select"
+              >
+                <option value="" disabled>
+                  Select size
+                </option>
+                <option value="METERS">Meters</option>
+                <option value="FT">Ft</option>
+                <option value="KG">KG</option>
+                <option value="INCHES">Inches</option>
+              </select>
+            </div>
             <div className="flex items-center gap-2 sm:col-span-2">
               <input
                 id="allowBackorder"
@@ -220,12 +350,12 @@ export function ProductsClient({
         searchValue={search}
         onSearchChange={setSearch}
         onSearch={() => refresh(1)}
-        placeholder="Search by SKU or name…"
+        placeholder="Search by SKU, name, manufacturer, or pitch…"
         pending={pending}
       />
 
       {pending && data.items.length === 0 ? (
-        <TableSkeleton columns={canMutate ? 6 : 5} />
+        <TableSkeleton columns={canMutate ? 11 : 10} />
       ) : (
         <DataPanel
           title="Product catalog"
@@ -245,11 +375,16 @@ export function ProductsClient({
             />
           ) : (
             <DataTableShell label="Product catalog">
-              <DataTable minWidth={720}>
+              <DataTable minWidth={1180}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>SKU</TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Manufacturer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Pitch</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Size</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="th-numeric">Unit</TableHead>
                     <TableHead className="th-numeric">Reorder at</TableHead>
@@ -267,6 +402,15 @@ export function ProductsClient({
                       <TableCell className="max-w-[200px] truncate font-medium">
                         {product.name}
                       </TableCell>
+                      <TableCell className="max-w-[160px] truncate">
+                        {product.manufacturer ?? "—"}
+                      </TableCell>
+                      <TableCell>{formatProductDate(product.productDate)}</TableCell>
+                      <TableCell>{product.pitch ?? "—"}</TableCell>
+                      <TableCell>
+                        {product.type ? TYPE_LABELS[product.type] : "—"}
+                      </TableCell>
+                      <TableCell>{formatSize(product.sizeValue, product.sizeUnit)}</TableCell>
                       <TableCell>
                         {product.category ? (
                           <CategoryBadge name={product.category.name} />

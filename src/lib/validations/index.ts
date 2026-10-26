@@ -23,6 +23,12 @@ export const productCreateSchema = z.object({
     }),
   reorderThreshold: z.coerce.number().int().min(0),
   allowBackorder: z.boolean().default(false),
+  manufacturer: z.string().trim().min(1).max(255),
+  productDate: z.coerce.date(),
+  pitch: z.string().trim().min(1).max(32),
+  type: z.enum(["INDOOR", "OUTDOOR"]),
+  sizeUnit: z.enum(["METERS", "FT", "KG", "INCHES"]),
+  sizeValue: z.coerce.number().positive(),
 });
 
 export const productUpdateSchema = productCreateSchema.partial().extend({
@@ -99,6 +105,33 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const userRoleSchema = z.enum(["ADMIN", "MANAGER", "VIEWER"]);
+
+export const userCreateSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  email: z.string().trim().email(),
+  role: userRoleSchema,
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+});
+
+export const userUpdateSchema = z.object({
+  id: z.string().cuid(),
+  name: z.string().trim().min(1).max(255),
+  email: z.string().trim().email(),
+  role: userRoleSchema,
+  password: z
+    .string()
+    .max(128)
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : undefined;
+    })
+    .refine((value) => value === undefined || value.length >= 8, {
+      message: "Password must be at least 8 characters",
+    }),
+});
+
 export type PaginationInput = z.input<typeof paginationSchema>;
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 export type ProductUpdateInput = z.infer<typeof productUpdateSchema>;
@@ -108,3 +141,5 @@ export type SupplierCreateInput = z.infer<typeof supplierCreateSchema>;
 export type SupplierUpdateInput = z.infer<typeof supplierUpdateSchema>;
 export type PoCreateInput = z.infer<typeof poCreateSchema>;
 export type PoReceiveInput = z.infer<typeof poReceiveSchema>;
+export type UserCreateInput = z.infer<typeof userCreateSchema>;
+export type UserUpdateInput = z.infer<typeof userUpdateSchema>;

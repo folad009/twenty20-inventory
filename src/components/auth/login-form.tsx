@@ -65,10 +65,6 @@ export function LoginForm() {
           />
         </div>
 
-        <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 font-mono text-xs text-muted-foreground">
-          Demo: manager@inventory.local / password123
-        </p>
-
         <Button
           type="submit"
           disabled={pending}

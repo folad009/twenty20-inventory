@@ -22,12 +22,14 @@ export async function listProducts(input: PaginationInput) {
             { sku: { contains: search, mode: "insensitive" } },
             { name: { contains: search, mode: "insensitive" } },
             { barcode: { contains: search, mode: "insensitive" } },
+            { manufacturer: { contains: search, mode: "insensitive" } },
+            { pitch: { contains: search, mode: "insensitive" } },
           ],
         }
       : {}),
   };
 
-  const [items, total] = await Promise.all([
+  const [rows, total] = await Promise.all([
     prisma.product.findMany({
       where,
       include: { category: true },
@@ -37,6 +39,11 @@ export async function listProducts(input: PaginationInput) {
     }),
     prisma.product.count({ where }),
   ]);
+
+  const items = rows.map((product) => ({
+    ...product,
+    sizeValue: product.sizeValue?.toString() ?? null,
+  }));
 
   return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 }
