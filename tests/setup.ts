@@ -1,8 +1,27 @@
-import { loadEnvConfig } from "@next/env";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { beforeAll } from "vitest";
 
-loadEnvConfig(process.cwd());
+// Same precedence as @next/env: the first file that defines a key wins,
+// and variables already set in the environment are left unchanged.
+function loadTestEnv() {
+  const mode = process.env.NODE_ENV === "test" ? "test" : process.env.NODE_ENV || "development";
+  const files = [
+    `.env.${mode}.local`,
+    mode === "test" ? null : ".env.local",
+    `.env.${mode}`,
+    ".env",
+  ].filter((file): file is string => file !== null);
+
+  for (const file of files) {
+    const path = resolve(process.cwd(), file);
+    if (!existsSync(path)) continue;
+    process.loadEnvFile(path);
+  }
+}
+
+loadTestEnv();
 
 // Services use DATABASE_URL via @/lib/prisma; point them at the test schema when set.
 if (process.env.TEST_DATABASE_URL) {
